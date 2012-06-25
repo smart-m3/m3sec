@@ -1,0 +1,151 @@
+package rxc_
+
+
+
+#define MYMAXPATH 512
+
+
+
+%#include <rx/rx.h>
+%#include <rx/rx_null.h>
+
+%#define	SAMPLE_SERVER_PORT			5000
+%#define	SAMPLE_SERVICE_PORT			0	/* i.e. user server's port */
+%#define	SAMPLE_SERVICE_ID			4
+
+/* Maximum number of requests that will be handled by this service simultaneously */
+/* This number will also be guaranteed to execute in parallel if no services' requests are being processed */
+%#define	SAMPLE_MAX	2
+/* Minimum number of requests that are guaranteed to be handled immediately */
+%#define	SAMPLE_MIN	1
+
+/* Index of the "null" security class in the sample service.  This must be 0 (there are N classes, numbered from 0.  In this case, N is 1) */
+%#define	SAMPLE_NULL	0
+
+
+/**********************
+fuse4_file_info taken from fuse.h the rxgen does not understands fuse.h too stupid
+mystat taken from man 2 mystat 
+these are required again rxgen is too stupid to understand the struct paras
+and will bump..
+**********************/
+struct my_file_info {
+    /** Open flags.  Available in open() and release() */
+    int flags;
+
+    /** File handle.  May be filled in by filesystem in open().
+        Available in all other file operations */
+    unsigned int fh;
+
+    /** In case of a write operation indicates if this was caused by a
+        writepage */
+    int writepage;
+};
+
+struct mystatfs {
+                 afs_uint32 f_type;     /* type of filesystem (see below) */
+                 afs_uint32 f_bsize;    /* optimal transfer block size */
+                 afs_uint32 f_blocks;   /* total data blocks in file system */
+                 afs_uint32 f_bfree;    /* free blocks in fs */
+                 afs_uint32 f_bavail;   /* free blocks avail to non-superuser */
+                 afs_uint32 f_files;    /* total file nodes in file system */
+                 afs_uint32 f_ffree;    /* free file nodes in fs */
+                 afs_uint32 f_fsid1;     /* file system id */
+                 afs_uint32 f_fsid2;     /* file system id */                 
+                 afs_uint32 f_namelen;  /* maximum length of filenames */
+                 afs_uint32 f_spare[6]; /* spare for later */
+              };
+
+struct mystat {
+                  afs_uint32         st_dev;      /* device */
+                  afs_uint32         st_ino;      /* inode */
+                  afs_uint32        st_mode;     /* protection */
+                  afs_uint32       st_nlink;    /* number of hard links */
+                  afs_uint32         st_uid;      /* user ID of owner */
+                  afs_uint32         st_gid;      /* group ID of owner */
+                  afs_uint32         st_rdev;     /* device type (if inode device) */
+                  afs_uint32         st_size;     /* total size, in bytes */
+                  afs_uint32     st_blksize;  /* blocksize for filesystem I/O */
+                  afs_uint32      st_blocks;   /* number of blocks allocated */
+                  afs_uint32        st_atim;    /* time of last access */
+                  afs_uint32        st_mtim;    /* time of last modification */
+                  afs_uint32        st_ctim;    /* time of last change */
+              };
+struct my_dirhandle{
+afs_uint32 type;
+afs_uint32 inode;
+char name[MYMAXPATH];
+};
+
+typedef	my_dirhandle bulkmydirhandles<>;
+	      
+/**************************************************************************************
+			phase 1 functions
+**************************************************************************************/
+rxc_getattr(IN string mypath<MYMAXPATH>, IN int dummy) split               = 1;
+rxc_getdirWrapper(IN string path<MYMAXPATH>, OUT bulkmydirhandles *handles)                        = 2;
+rxc_read(IN string path<MYMAXPATH>, IN afs_uint32 size, IN afs_uint32 offset, IN struct my_file_info *fi)    split      = 3;
+rxc_open(IN string path<MYMAXPATH>, IN int flags, OUT u_int *hd)                                    = 4;
+rxc_write(IN string path<MYMAXPATH>,IN afs_uint32 size, IN afs_uint32 offset, IN struct my_file_info *fi)    split      = 5;
+rxc_chmod(IN string path<MYMAXPATH>, IN afs_uint32 mode)                        = 6;
+rxc_chown(IN string path<MYMAXPATH>, IN afs_uint32 uid, IN afs_uint32 gid)               = 7;
+rxc_utime(IN string path<MYMAXPATH>, IN afs_uint32 at,IN afs_uint32 mt)                = 8;
+rxc_mknod(IN string path<MYMAXPATH>, afs_uint32 mode, afs_uint32 rdev)  = 9 ;
+
+rxc_mkdir(IN string path<MYMAXPATH>, IN afs_uint32 mode)                        = 10;
+rxc_unlink(IN string path<MYMAXPATH>)                                    = 11	;
+rxc_rmdir(IN string path<MYMAXPATH>)                                     = 12;
+rxc_rename(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                    = 13;
+
+rxc_truncate(IN string path<MYMAXPATH>, IN afs_uint32 size)                      = 14;
+
+
+rxc_release(IN string path<MYMAXPATH>, IN struct my_file_info *fi)                                 = 15;
+rxc_readlink(IN string path<MYMAXPATH>, IN afs_uint32 size,OUT string data<MYMAXPATH>)            = 16;
+
+rxc_symlink(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                   = 17;
+rxc_link(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                      = 18;
+
+rxc_statfs(IN string path<MYMAXPATH>, OUT struct mystatfs *stbuf)         = 19;
+rxc_fsync(IN string path <MYMAXPATH>, IN int isdatasync, IN struct my_file_info *fi) = 20       ;
+rxc_flush(IN string path <MYMAXPATH>, IN struct my_file_info *fi) = 21       ;
+
+
+
+
+/*********************************************************************
+			phase 1+ functions
+rxc_mkdir(IN string path<MYMAXPATH>, IN afs_uint32 mode)                        = 3;
+rxc_unlink(IN string path<MYMAXPATH>)                                    = 4	;
+rxc_rmdir(IN string path<MYMAXPATH>)                                     = 5;
+rxc_rename(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                    = 7;
+rxc_truncate(IN string path<MYMAXPATH>, IN afs_uint32 size)                      = 11;
+rxc_utime(IN string path<MYMAXPATH>, OUT afs_uint32 *buf)                = 12;
+rxc_release(IN string path<MYMAXPATH>, IN struct my_file_info *fi)                                 = 18;
+rxc_readlink(IN string path<MYMAXPATH>, IN afs_uint32 size)  					      split       = 2;
+rxc_symlink(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                   = 6;
+rxc_link(IN string from<MYMAXPATH>, IN string to<MYMAXPATH>)                      = 8;
+rxc_statfs(IN string path<MYMAXPATH>, OUT struct mystatfs *stbuf)              = 13;
+rxc_release(IN string path<MYMAXPATH>, IN struct my_file_info *fi)                                 = 18;
+
+*********************************************************************/
+
+
+/***************************************************************************************
+not supported for now !:-(
+**************************************************************************************
+**      rxc_fsync(const string *path, int isdatasync, struct my_file_info *fi)
+**	rxc_setxattr(const string *path, const string *name, const string *value, afs_uint32 size, int flags)
+**	rxc_getxattr(const string *path, const string *name, string *value,afs_uint32 size)
+**	rxc_listxattr(const string *path, string *list, afs_uint32 size)
+**	rxc_removexattr(const string *path, const string *name)
+**	
+***************************************************************************************/
+
+
+
+
+
+
+
+
